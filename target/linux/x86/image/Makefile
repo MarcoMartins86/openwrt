@@ -33,6 +33,7 @@ GRUB_TIMEOUT:=$(call qstrip,$(CONFIG_GRUB_TIMEOUT))
 GRUB_TITLE:=$(call qstrip,$(CONFIG_GRUB_TITLE))
 
 BOOTOPTS:=$(call qstrip,$(CONFIG_GRUB_BOOTOPTS))
+MICROCODE:=$(call qstrip,$(CONFIG_GRUB_MICROCODE))
 
 define Build/combined
 	$(CP) $(KDIR)/$(KERNEL_NAME) $@.boot/boot/vmlinuz
@@ -64,6 +65,41 @@ define Build/grub-config
 		-e 's#@TIMEOUT@#$(GRUB_TIMEOUT)#g' \
 		-e 's#@TITLE@#$(GRUB_TITLE)#g' \
 		./grub-$(1).cfg > $@.boot/boot/grub/grub.cfg
+	$(if $(MICROCODE),$(call Build/grub-microcode))
+endef
+
+# The microcode named in CONFIG_GRUB_MICROCODE, in the uncompressed cpio archive
+# the kernel looks for at boot. Only the default entry loads it, as an initrd,
+# and "noinitrd" would make the kernel ignore it there.
+define Build/grub-microcode
+	rm -rf $@.ucode
+	$(INSTALL_DIR) $@.ucode/kernel/x86/microcode
+	for file in $(MICROCODE); do \
+		[ -f "$(TARGET_DIR)/lib/firmware/$$file" ] || { \
+			echo "GRUB_MICROCODE: /lib/firmware/$$file is not in the image" >&2; \
+			exit 1; \
+		}; \
+		case "$$file" in \
+		intel-ucode/*) vendor=GenuineIntel ;; \
+		amd-ucode/*) vendor=AuthenticAMD ;; \
+		*) echo "GRUB_MICROCODE: $$file is not Intel or AMD microcode" >&2; exit 1 ;; \
+		esac; \
+		cat "$(TARGET_DIR)/lib/firmware/$$file" >> $@.ucode/kernel/x86/microcode/$$vendor.bin; \
+	done
+	$(if $(SOURCE_DATE_EPOCH),find $@.ucode -exec touch -hd @$(SOURCE_DATE_EPOCH) {} +)
+	cd $@.ucode && find kernel | LC_ALL=C sort | \
+		$(STAGING_DIR_HOST)/bin/cpio --quiet -o -H newc -R 0:0 --reproducible \
+		> $@.boot/boot/microcode.cpio
+	rm -rf $@.ucode
+	awk '{ \
+		if ($$0 ~ /^[ \t]*linux / && $$0 !~ /failsafe/) { \
+			sub(/ noinitrd/, ""); \
+			print; \
+			print "\tinitrd /boot/microcode.cpio"; \
+		} else \
+			print; \
+	}' $@.boot/boot/grub/grub.cfg > $@.boot/boot/grub/grub.cfg.new
+	mv $@.boot/boot/grub/grub.cfg.new $@.boot/boot/grub/grub.cfg
 endef
 
 define Build/grub-install
