@@ -1,0 +1,39 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Marco Martins <marcomartins86@gmail.com>
+Date: Mon, 9 Nov 2026 22:42:27 +0000
+Subject: [PATCH] wifi: b43: report the TX ACK status
+
+b43 tells mac80211 in each TX status whether the frame was acked, but
+does not set REPORTS_TX_ACK_STATUS. Without it, mac80211 does not take
+back a frame that failed while its station dozes (see
+ieee80211_tx_status_ext()), so the frames that were already in the DMA
+ring when a station went to sleep are lost: holding back the frames of
+dozing stations only covers those still in tx_queue.
+
+With the flag, mac80211 buffers them again, and they go out on the
+station's next wake.
+
+ASUS WL-320gE (BCM5352, G-PHY) as an AP, with an Android phone on it
+with its screen off, pinged once a second over the wire while a PC ran
+TCP downloads through the AP, 90 pings per run, 9 runs each: without the
+flag, 37-62 pings were lost (median 43); with it, 0-17 (median 3). The
+replies come later instead: median 199 -> 267 ms, the slowest in 8.3 s.
+TCP download was the same, 14.1-17.0 against 14.3-16.6 Mbit/s.
+
+Signed-off-by: Marco Martins <marcomartins86@gmail.com>
+---
+ drivers/net/wireless/broadcom/b43/main.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/net/wireless/broadcom/b43/main.c b/drivers/net/wireless/broadcom/b43/main.c
+index f3b4dc4..bfe94b8 100644
+--- a/drivers/net/wireless/broadcom/b43/main.c
++++ b/drivers/net/wireless/broadcom/b43/main.c
+@@ -6881,6 +6881,7 @@ static struct b43_wl *b43_wireless_init(struct b43_bus_dev *dev)
+ 	ieee80211_hw_set(hw, MFP_CAPABLE);
+ 	ieee80211_hw_set(hw, AMPDU_AGGREGATION);
+ 	ieee80211_hw_set(hw, SUPPORT_FAST_XMIT);
++	ieee80211_hw_set(hw, REPORTS_TX_ACK_STATUS);
+ 	/* Room for the TX header in front of the frame (one DMA descriptor) */
+ 	if (b43_dma_txhdr_in_skb(dev))
+ 		hw->extra_tx_headroom = sizeof(struct b43_txhdr);
