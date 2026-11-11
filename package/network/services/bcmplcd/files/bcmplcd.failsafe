@@ -1,0 +1,6 @@
+# the Ethernet port is behind the chip, there is no network before it runs
+failsafe_bcmplcd() {
+	bcmplcd </dev/null >/dev/null 2>&1 &
+}
+
+boot_hook_add failsafe failsafe_bcmplcd
