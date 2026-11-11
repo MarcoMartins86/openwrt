@@ -1,0 +1,27 @@
+From: Marco Martins <marcomartins86@gmail.com>
+Subject: [PATCH] tplink-safeloader: give the file system the whole rest of the
+ firmware partition
+
+The size of the file-system partition is what is left of the firmware
+partition after the kernel, but the offset of the firmware partition in
+the flash was taken off as well. The root file system was refused that
+many bytes before the partition was full: 128 KiB on most layouts, and
+384 KiB where the firmware starts at 0x60000.
+
+Signed-off-by: Marco Martins <marcomartins86@gmail.com>
+---
+ src/tplink-safeloader.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+--- a/src/tplink-safeloader.c
++++ b/src/tplink-safeloader.c
+@@ -3940,7 +3940,8 @@
+ 		if (!sysupgrade)
+ 			file_system_partition->base = ALIGN(firmware_partition->base + kernel.st_size, 0x10000);
+ 
+-		file_system_partition->size = firmware_partition->size - file_system_partition->base;
++		file_system_partition->size = firmware_partition->base + firmware_partition->size -
++					      file_system_partition->base;
+ 
+ 		os_image_partition->name = info->partition_names.os_image;
+ 
