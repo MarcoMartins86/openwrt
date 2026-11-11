@@ -1,0 +1,12 @@
+#!/bin/sh
+
+[ "$ACTION" = "released" ] || exit 0
+
+# a second press ends a pairing that is under way
+if pidof bcmplc >/dev/null; then
+	bcmplc cancel
+else
+	bcmplc pair 2>&1 | logger -t bcmplc &
+fi
+
+exit 0
