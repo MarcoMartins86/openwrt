@@ -21,7 +21,8 @@ define Package/bcmplcd/description
   the host for their firmware after a reset, and keep their parameters on
   the host. This daemon answers both, from the flash partitions that the
   stock firmware of the device uses for it. bcmplc talks to the running
-  chip: pairing, the stations of the powerline network, the network key.
+  chip: pairing, the stations of the powerline network, the network key,
+  the LEDs of the adapters, the Ethernet socket on the chip.
 endef
 
 define Package/bcmplcd/conffiles
